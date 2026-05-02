@@ -1,0 +1,101 @@
+pipeline {
+  agent {
+    kubernetes {
+      yaml """
+apiVersion: v1
+kind: Pod
+spec:
+  serviceAccountName: jenkins-kaniko-agent
+  containers:
+    - name: kaniko
+      image: gcr.io/kaniko-project/executor:debug
+      command:
+        - /busybox/cat
+      tty: true
+      env:
+        - name: AWS_SDK_LOAD_CONFIG
+          value: "true"
+"""
+    }
+  }
+
+  options {
+    timestamps()
+    disableConcurrentBuilds()
+    buildDiscarder(logRotator(numToKeepStr: '20'))
+  }
+
+  parameters {
+    string(name: 'IMAGE_TAG', defaultValue: '', description: '비워두면 git short sha를 이미지 태그로 사용합니다.')
+    booleanParam(name: 'PUSH_IMAGE', defaultValue: true, description: 'main 브랜치에서 ECR 이미지 push 여부')
+  }
+
+  environment {
+    AWS_ACCOUNT_ID = '881490135253'
+    AWS_REGION = 'ap-northeast-2'
+    JENKINS_AGENT_SERVICE_ACCOUNT = 'jenkins-kaniko-agent'
+    IMAGE_PREFIX = 'team9-'
+    IMAGE_NAME = 'rtmp'
+    DOCKER_CONTEXT = '.'
+    DOCKERFILE = 'Dockerfile'
+    PLATFORM = 'linux/amd64'
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
+    }
+
+    stage('Prepare') {
+      steps {
+        script {
+          env.RESOLVED_IMAGE_TAG = params.IMAGE_TAG?.trim()
+            ? params.IMAGE_TAG.trim()
+            : sh(returnStdout: true, script: 'git rev-parse --short=12 HEAD').trim()
+          env.ECR_REGISTRY = "${env.AWS_ACCOUNT_ID}.dkr.ecr.${env.AWS_REGION}.amazonaws.com"
+          env.IMAGE_REF = "${env.ECR_REGISTRY}/${env.IMAGE_PREFIX}${env.IMAGE_NAME}:${env.RESOLVED_IMAGE_TAG}"
+          echo "Image: ${env.IMAGE_REF}"
+        }
+      }
+    }
+
+    stage('PR Image Build Check') {
+      when { changeRequest target: 'main' }
+      steps {
+        container('kaniko') {
+          sh '''
+            /kaniko/executor \
+              --context "$WORKSPACE/$DOCKER_CONTEXT" \
+              --dockerfile "$WORKSPACE/$DOCKERFILE" \
+              --custom-platform "$PLATFORM" \
+              --no-push \
+              --no-push-cache
+          '''
+        }
+      }
+    }
+
+    stage('Main Image Push') {
+      when {
+        allOf {
+          branch 'main'
+          expression { return params.PUSH_IMAGE }
+        }
+      }
+      steps {
+        container('kaniko') {
+          sh '''
+            /kaniko/executor \
+              --context "$WORKSPACE/$DOCKER_CONTEXT" \
+              --dockerfile "$WORKSPACE/$DOCKERFILE" \
+              --custom-platform "$PLATFORM" \
+              --destination "$IMAGE_REF" \
+              --cache=false
+          '''
+        }
+      }
+    }
+  }
+}
