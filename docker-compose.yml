@@ -9,4 +9,6 @@ services:
     ports:
       - "1935:1935"
       - "8088:80"
+    environment:
+      - RTMP_CALLBACK_SECRET=${RTMP_CALLBACK_SECRET:-rtmp-dev-secret}
     restart: unless-stopped
