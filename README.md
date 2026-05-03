@@ -19,6 +19,7 @@
 ## 2) 이미지 빌드
 
 이 저장소는 `Dockerfile`로 `nginx/nginx.conf`를 포함한 NGINX-RTMP 이미지를 만든다.
+base image는 재빌드 시 예기치 않은 변경을 막기 위해 `alfg/nginx-rtmp:v1.6.0`으로 고정한다. 버전 변경이 필요하면 Docker Hub 태그를 확인한 뒤 `Dockerfile`과 이 문서를 함께 갱신한다.
 
 ```bash
 docker build -t team9-rtmp:local .
