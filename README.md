@@ -24,7 +24,7 @@
 docker build -t team9-rtmp:local .
 ```
 
-Jenkins를 쓰는 경우에는 `Jenkinsfile`이 같은 컨텍스트를 `kaniko`로 빌드해서 ECR에 푸시한다.
+Jenkins를 쓰는 경우에는 `jenkins/Jenkinsfile`이 같은 컨텍스트를 `kaniko`로 빌드해서 ECR에 푸시한다. 루트 `Jenkinsfile`은 중복 source of truth를 피하기 위해 사용하지 않는다.
 
 ## 3) 서버 실행
 
